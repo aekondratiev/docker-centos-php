@@ -1,0 +1,35 @@
+machine:
+  services:
+    - docker
+
+dependencies:
+  cache_directories:
+    - "~/docker"
+
+  pre:
+    - docker info && docker version
+    # Cache some Docker images to make builds faster
+    - mkdir -p ~/docker
+    # Cache centos:centos7
+    - if [[ -e ~/docker/centos.tar ]]; then docker load -i ~/docker/centos.tar; else docker pull centos:centos7 && docker save centos:centos7 > ~/docker/centos.tar; fi
+    
+  override:
+    - docker pull centos:centos7
+
+# Run tests
+test:
+  pre:
+    # Build massdest/docker-centos-nginx image
+    - docker build -t massdest/docker-centos-nginx .
+
+  override:
+    - docker run -d massdest/docker-centos-nginx
+    - docker run -d massdest/docker-centos-nginx "ps aux"
+    # Test if supervisord is running
+    - docker run -it massdest/docker-centos-nginx "ps aux | grep supervisord"
+    # Test if supervisorctl is working
+    - docker run -it massdest/docker-centos-nginx "supervisorctl stop all"
+    # Test nginx config
+    - docker run -it massdest/docker-centos-nginx "nginx -t"
+    # Test if we have inotify working
+    - docker run -it massdest/docker-centos-nginx "inotifywatch -t 1 /home | tee /tmp/out"
